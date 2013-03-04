@@ -6,7 +6,7 @@ version := "0.1"
 
 fork in run := true
 
-javaOptions in run += "-Xmx2G"
+javaOptions in run += "-Xmx1562M"
 
 libraryDependencies ++= Seq(
 	"com.typesafe.akka" %% "akka-actor" % "2.1.0",
