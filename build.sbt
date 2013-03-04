@@ -8,10 +8,10 @@ fork in run := true
 
 javaOptions in run += "-Xmx1562M"
 
-libraryDependencies ++= Seq(
-	"com.typesafe.akka" %% "akka-actor" % "2.1.0",
-	"com.top10" %% "scala-redis-client" % "1.10.0" withSources()
-)
+//libraryDependencies ++= Seq(
+//	"com.typesafe.akka" %% "akka-actor" % "2.1.0",
+//	"com.top10" %% "scala-redis-client" % "1.10.0" withSources()
+//)
 
 
 
