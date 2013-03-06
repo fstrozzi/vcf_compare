@@ -6,6 +6,12 @@ import scala.collection.JavaConversions._
 
 object VcfCompare extends App {
 
+  val conf = new Conf(args)
+  println(conf.summary)
+  val files = conf.input()
+  val table = conf.createTable()
+  val common = conf.checkCommon()
+
   val dict = Map[String, Short]("00" -> 0, "AA" -> 1, "AT" -> 2, "AC" -> 3, "AG" -> 4,
     "TA" -> 5, "TC" -> 6, "TG" -> 7, "TT" -> 8,
     "CA" -> 9, "CT" -> 10, "CG" -> 11, "CC" -> 12,
@@ -13,16 +19,22 @@ object VcfCompare extends App {
   )
   val dictRev = dict.map(_.swap)
 
-  val maxSamples = args.size
+  val maxSamples = files.size
   val vcf = new java.util.HashMap[String, Array[Short]]()
 
-  args.zipWithIndex.foreach {
+  files.zipWithIndex.foreach {
     a =>
       val vcfFile = openFile(a._1)
       addVcf(vcf, vcfFile, a._2, maxSamples, dict)
       println(vcf.size)
   }
-  writeMatrix(vcf, dictRev, args)
+
+  if (table) {
+    writeMatrix(vcf, dictRev, files)
+  }
+  if (common) {
+    checkCommon(vcf, files)
+  }
 
   def openFile(vcf: String): BufferedSource = {
     if (vcf.endsWith(".gz")) {
@@ -65,11 +77,11 @@ object VcfCompare extends App {
       alt + alt
     }
     else {
-      alt.split(',').reduceLeft((a, b) => a + b)
+      alt.replaceAll(",", "")
     }
   }
 
-  def writeMatrix(vcf: java.util.HashMap[String, Array[Short]], dictRev: Map[Short, String], fileNames: Array[String]) {
+  def writeMatrix(vcf: java.util.HashMap[String, Array[Short]], dictRev: Map[Short, String], fileNames: List[String]) {
     val out = new java.io.FileWriter("all_snps.txt")
     val names = fileNames.map(el => el.split("/").last)
     out.write(names.mkString("\t") + "\n")
@@ -78,6 +90,12 @@ object VcfCompare extends App {
         val genotypes = vcf(k).map(el => dictRev(el))
         out.write(k + "\t" + genotypes.mkString("\t") + "\n")
     }
+  }
+
+  def checkCommon(vcf: java.util.HashMap[String, Array[Short]], fileNames: List[String]) {
+    // TODO Add function to compare the elements 2by2
+    // TODO Add function to check unique elements for each sample
+    // TODO Add function to check elements present in all samples
   }
 
 }
