@@ -21,19 +21,23 @@ object VcfCompare extends App {
 
   val maxSamples = files.size
   val vcf = new java.util.HashMap[String, Array[Short]]()
+  val names = files.map(el => el.split("/").last)
 
   files.zipWithIndex.foreach {
     a =>
       val vcfFile = openFile(a._1)
+      println("Reading file " + a._1 + "...")
       addVcf(vcf, vcfFile, a._2, maxSamples, dict)
       println(vcf.size)
   }
 
   if (table) {
-    writeMatrix(vcf, dictRev, files)
+    println("Writing global SNPs table...")
+    writeMatrix(vcf, dictRev, names)
   }
   if (common) {
-    checkCommon(vcf, files)
+    println("Checking common SNPs across samples...")
+    checkCommon(vcf, names)
   }
 
   def openFile(vcf: String): BufferedSource = {
@@ -81,10 +85,9 @@ object VcfCompare extends App {
     }
   }
 
-  def writeMatrix(vcf: java.util.HashMap[String, Array[Short]], dictRev: Map[Short, String], fileNames: List[String]) {
+  def writeMatrix(vcf: java.util.HashMap[String, Array[Short]], dictRev: Map[Short, String], sampleNames: List[String]) {
     val out = new java.io.FileWriter("all_snps.txt")
-    val names = fileNames.map(el => el.split("/").last)
-    out.write(names.mkString("\t") + "\n")
+    out.write("SNPID\t" + sampleNames.mkString("\t") + "\n")
     vcf.keySet().foreach {
       k =>
         val genotypes = vcf(k).map(el => dictRev(el))
@@ -92,11 +95,53 @@ object VcfCompare extends App {
     }
   }
 
-  def checkCommon(vcf: java.util.HashMap[String, Array[Short]], fileNames: List[String]) {
-    // TODO Add function to compare the elements 2by2
+  def checkCommon(vcf: java.util.HashMap[String, Array[Short]], sampleNames: List[String]) {
     // TODO Add function to check unique elements for each sample
-    // TODO Add function to check elements present in all samples
+
+    var samples = initSamples(sampleNames)
+    samples = checkCommonSNPs(sampleNames, samples, vcf)
+    samples.keys.foreach {
+      k => println(k, samples(k))
+    }
+  }
+
+  def initSamples(names: List[String]): scala.collection.mutable.Map[String, Int] = {
+    val sampleMap = scala.collection.mutable.Map[String, Int]()
+    sampleMap += "all" -> 0
+    names.zipWithIndex.foreach {
+      n =>
+        sampleMap += n._1 -> 0
+        for (pos <- new Range(n._2 + 1, names.size, 1)) {
+          sampleMap += n._1 + "-" + names(pos) -> 0
+        }
+    }
+    sampleMap
+  }
+
+  def checkCommonSNPs(names: List[String], s: scala.collection.mutable.Map[String, Int], vcf: java.util.HashMap[String, Array[Short]]): scala.collection.mutable.Map[String, Int] = {
+    vcf.keySet().foreach {
+      k =>
+        val snps = vcf(k)
+        val size = snps.size
+        val zero: Short = 0
+        snps.zipWithIndex.foreach {
+          i =>
+            if (i._1 != zero) {
+              for (pos <- new Range(i._2 + 1, size, 1)) {
+                if (snps(pos) != zero) {
+                  s(names(i._2) + "-" + names(pos)) += 1
+                }
+              }
+            }
+        }
+        if (!snps.contains(zero)) {
+          s("all") += 1
+        }
+    }
+    s
   }
 
 }
+
+
 
