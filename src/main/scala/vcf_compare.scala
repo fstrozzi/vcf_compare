@@ -97,6 +97,7 @@ object VcfCompare extends App {
 
   def checkCommon(vcf: java.util.HashMap[String, Array[Short]], sampleNames: List[String]) {
     // TODO Add function to check unique elements for each sample
+    // TODO Add functions to accept user defined comparisons across samples (or groups of samples)
 
     var samples = initSamples(sampleNames)
     samples = checkCommonSNPs(sampleNames, samples, vcf)
@@ -124,7 +125,7 @@ object VcfCompare extends App {
         val snps = vcf(k)
         val size = snps.size
         val zero: Short = 0
-        snps.zipWithIndex.foreach {
+        /*snps.zipWithIndex.foreach {
           i =>
             if (i._1 != zero) {
               for (pos <- new Range(i._2 + 1, size, 1)) {
@@ -133,9 +134,12 @@ object VcfCompare extends App {
                 }
               }
             }
-        }
+        }*/
         if (!snps.contains(zero)) {
           s("all") += 1
+        }
+        if (snps.count(_ != 0) == 1) {
+          s(names(snps.indexWhere(_ != 0))) += 1
         }
     }
     s
