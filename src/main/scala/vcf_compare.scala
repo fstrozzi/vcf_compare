@@ -8,8 +8,7 @@ object VcfCompare extends App {
 
   val conf = new Conf(args)
   println(conf.summary)
-  val files = conf.input()
-  val table = conf.createTable()
+  val save = conf.saveTable()
   val common = conf.checkCommon()
 
   val dict = Map[String, Short]("00" -> 0, "AA" -> 1, "AT" -> 2, "AC" -> 3, "AG" -> 4,
@@ -17,27 +16,50 @@ object VcfCompare extends App {
     "CA" -> 9, "CT" -> 10, "CG" -> 11, "CC" -> 12,
     "GA" -> 13, "GT" -> 14, "GC" -> 15, "GG" -> 16
   )
+  
   val dictRev = dict.map(_.swap)
+  var vcf = new java.util.HashMap[String,Array[Short]]
+  var sampleNames = List[String]()
 
-  val maxSamples = files.size
-  val vcf = new java.util.HashMap[String, Array[Short]]()
-  val names = files.map(el => el.split("/").last)
-
-  files.zipWithIndex.foreach {
-    a =>
-      val vcfFile = openFile(a._1)
-      println("Reading file " + a._1 + "...")
-      addVcf(vcf, vcfFile, a._2, maxSamples, dict)
-      println(vcf.size)
+  if(!conf.input().isEmpty) {
+    val res = readVcf(conf.input()) 
+    vcf = res._1
+    sampleNames = res._2
   }
-
-  if (table) {
+  else {
+    println("Reading data from table file...")
+    val res = readTable(conf.readTable(),dict)
+    vcf = res._1
+    sampleNames = res._2
+    println("Total SNPs read: "+vcf.size)
+  }
+  if (save) {
     println("Writing global SNPs table...")
-    writeMatrix(vcf, dictRev, names)
+    writeMatrix(vcf, dictRev, sampleNames)
   }
   if (common) {
     println("Checking common SNPs across samples...")
-    checkCommon(vcf, names)
+    checkCommon(vcf, sampleNames)
+  }
+
+
+  // Functions
+
+
+  def readVcf(files: List[String]) = { 
+    val maxSamples = files.size
+    val vcf =  new java.util.HashMap[String, Array[Short]]()
+
+    // removing path slashes and dots from filenames
+    val names = files.map(el => el.split("/").last.split("""\.""")(0))
+    files.zipWithIndex.foreach {
+      a =>
+        val vcfFile = openFile(a._1)
+        println("Reading file " + a._1 + "...")
+        addVcf(vcf, vcfFile, a._2, maxSamples, dict)
+        println("Total SNPs read from VCF: " + vcf.size)
+    }
+    (vcf,names)
   }
 
   def openFile(vcf: String): BufferedSource = {
@@ -87,12 +109,13 @@ object VcfCompare extends App {
 
   def writeMatrix(vcf: java.util.HashMap[String, Array[Short]], dictRev: Map[Short, String], sampleNames: List[String]) {
     val out = new java.io.FileWriter("all_snps.txt")
-    out.write("SNPID\t" + sampleNames.mkString("\t") + "\n")
+    out.write("# SNPID\t" + sampleNames.mkString("\t") + "\n")
     vcf.keySet().foreach {
       k =>
         val genotypes = vcf(k).map(el => dictRev(el))
         out.write(k + "\t" + genotypes.mkString("\t") + "\n")
     }
+    out.close()
   }
 
   def checkCommon(vcf: java.util.HashMap[String, Array[Short]], sampleNames: List[String]) {
@@ -116,6 +139,8 @@ object VcfCompare extends App {
     }
     sampleMap
   }
+
+  // performs a simple comparison
 
   def checkCommonSNPs(names: List[String], s: scala.collection.mutable.Map[String, Int], vcf: java.util.HashMap[String, Array[Short]]): scala.collection.mutable.Map[String, Int] = {
     vcf.keySet().foreach {
@@ -141,6 +166,25 @@ object VcfCompare extends App {
         }
     }
     s
+  }
+
+  // load the matrix from the table file
+
+  def readTable(file: String,dict: Map[String,Short]) = {
+    var names = List[String]()
+    var vcf = new java.util.HashMap[String,Array[Short]]()
+    Source.fromFile(file).getLines.foreach {line =>
+      if (line.startsWith("#")) {
+        val header = line.split("\t")
+        names = header.slice(1,header.size).toList
+      }
+      else {
+        val data = line.split("\t")
+        vcf.put(data(0),data.slice(1,data.size).map(el => dict(el))) // getting snp name and genotypes from file and converting
+                                                                     // genotypes in numbers using dict
+      }
+    }
+    (vcf,names)
   }
 
 }
